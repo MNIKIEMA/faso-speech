@@ -294,24 +294,24 @@ def archive_entries(
             if max_pages and page_count > max_pages:
                 break
             record_id = record_id_for(source_record)
-            if record_id in existing_ids:
-                break
-            if dry_run:
-                print(f"would archive {source_record.app_url}")
-                break
 
             try:
-                archived_record = archive_one_page(
-                    source_record,
-                    app_html,
-                    output_dir,
-                    download_audio=download_audio,
-                    source_html=source_html if page_count == 1 else "",
-                )
-                append_csv(index_path, [archive_to_index_row(archived_record)], INDEX_COLUMNS)
-                archived += 1
-
                 parsed = parse_page(app_html, source_record)
+                if dry_run:
+                    if record_id not in existing_ids:
+                        print(f"would archive {source_record.app_url}")
+                elif record_id not in existing_ids:
+                    archived_record = archive_one_page(
+                        source_record,
+                        app_html,
+                        output_dir,
+                        download_audio=download_audio,
+                        source_html=source_html if page_count == 1 else "",
+                    )
+                    append_csv(index_path, [archive_to_index_row(archived_record)], INDEX_COLUMNS)
+                    existing_ids.add(record_id)
+                    archived += 1
+
                 if not parsed.next_page:
                     break
                 source_record = SourceRecord(
