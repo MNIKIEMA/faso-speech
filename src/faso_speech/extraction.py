@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 
 from faso_speech.audio import cut_audio
+from faso_speech.language import infer_text_language
 from faso_speech.models import RecordStatus
 
 
@@ -65,6 +66,14 @@ def parse_filter(filter_expr: str) -> dict[str, str]:
     return filters
 
 
+def processing_language(text_row: dict[str, str], record: dict[str, str]) -> tuple[str, str]:
+    raw_language = text_row.get("language") or record["language"]
+    inferred_language = infer_text_language(text_row["text"], record["language"])
+    if raw_language != inferred_language:
+        return inferred_language, f"language_reclassified:{raw_language}->{inferred_language}"
+    return inferred_language, ""
+
+
 def extract_timed(
     *,
     input_index: Path,
@@ -105,6 +114,7 @@ def extract_timed(
             chunk_text = chunk_dir / f"{chunk_id}.txt"
             start = float(timing["start"])
             end = float(timing["end"])
+            language, review_note = processing_language(text_row, record)
 
             if not dry_run:
                 cut_audio(
@@ -123,7 +133,7 @@ def extract_timed(
                     "chunk_id": chunk_id,
                     "record_id": record["record_id"],
                     "catalog_id": record["catalog_id"],
-                    "language": text_row.get("language") or record["language"],
+                    "language": language,
                     "content_type": record["content_type"],
                     "source_site": record["source_site"],
                     "source_url": record["source_url"],
@@ -142,7 +152,7 @@ def extract_timed(
                     "chunk_text": str(chunk_text),
                     "text": text_row["text"],
                     "status": RecordStatus.CANDIDATE.value,
-                    "review_note": "",
+                    "review_note": review_note,
                     "created_at": record["scraped_at"],
                 }
             )

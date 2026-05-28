@@ -644,12 +644,23 @@ For Moore Burkina content, timestamped text is expected to be common. The
 processing pipeline should first try site-provided timings, then use VAD or
 manual review when timings are missing, incomplete, or suspicious.
 
-Language inference should use the source language from the catalog, not
-hard-coded labels:
+Language inference should use the source language from the catalog as the
+default. Source markup such as `bdit` is only a weak signal because some Moore
+Burkina pages use it for local-language text as well as French translations.
+The archive parser may store a best-effort language label, but processing
+should re-check each text block and record any correction in review metadata
+rather than silently trusting stale raw labels.
+
+If the lightweight rules are not sufficient, add a GlotLID-based validation
+step in processing. GlotLID should be a fallback for uncertain or conflicting
+cases, not a mandatory dependency for every archive run. The raw archive should
+remain reproducible without model downloads; model-based language ID belongs in
+derived processing outputs and should record the model name/version, score, and
+decision reason.
 
 ```python
-def infer_language(fragment, source_language):
-    if "bdit" in fragment:
+def infer_language(fragment, text, source_language):
+    if source_markup_suggests_translation(fragment) and looks_french(text):
         return "french"
     return source_language
 ```

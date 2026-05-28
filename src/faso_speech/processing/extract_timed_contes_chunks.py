@@ -7,6 +7,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from faso_speech.language import infer_app_builder_language
+
 
 BASE_URLS = [
     "https://media.ipsapps.org/mos/ora/co1/01-B001-001.html",
@@ -105,10 +107,12 @@ def clean_html_text(fragment):
     return " ".join(html.unescape(fragment).split())
 
 
-def infer_language(fragment):
-    if "bdit" in fragment:
-        return "french"
-    return "moore"
+def infer_language(fragment, text):
+    return infer_app_builder_language(
+        node_html=fragment,
+        text=text,
+        source_language="moore",
+    )
 
 
 def parse_text_blocks(document):
@@ -120,9 +124,10 @@ def parse_text_blocks(document):
         flags=re.DOTALL,
     ):
         body = match.group("body")
+        text = clean_html_text(body)
         blocks[match.group("label")] = {
-            "text": clean_html_text(body),
-            "language": infer_language(body),
+            "text": text,
+            "language": infer_language(body, text),
         }
     return blocks
 

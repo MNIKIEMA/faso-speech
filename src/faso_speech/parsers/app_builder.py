@@ -5,6 +5,7 @@ import urllib.parse
 
 from bs4 import BeautifulSoup
 
+from faso_speech.language import infer_app_builder_language
 from faso_speech.models import Language, ParsedPage, SourceRecord, TextBlock, Timing
 
 
@@ -38,12 +39,6 @@ def parse_timings(html: str) -> list[Timing]:
     return timings
 
 
-def infer_language(node_html: str, source_language: Language) -> Language:
-    if "bdit" in node_html:
-        return "french"
-    return source_language
-
-
 def parse_text_blocks(html: str, source_language: Language) -> list[TextBlock]:
     soup = BeautifulSoup(html, "lxml")
     blocks = []
@@ -56,7 +51,11 @@ def parse_text_blocks(html: str, source_language: Language) -> list[TextBlock]:
             TextBlock(
                 label=label,
                 text=text,
-                language=infer_language(str(node), source_language),
+                language=infer_app_builder_language(
+                    node_html=str(node),
+                    text=text,
+                    source_language=source_language,
+                ),
             )
         )
     return blocks
