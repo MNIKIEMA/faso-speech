@@ -112,6 +112,16 @@ CATALOG: list[CatalogEntry] = [
         notes="Moore Burkina Fulfuldé contes volume 1.",
     ),
     CatalogEntry(
+        id="fulfulde-contes-vol2",
+        language="fulfulde",
+        content_type="contes",
+        source_site="mooreburkina.com",
+        source_url="https://mooreburkina.com/fr/fulfulde/15-contes-en-fulfulde",
+        parser="app_builder",
+        priority=2,
+        notes="Moore Burkina Fulfuldé 15 contes.",
+    ),
+    CatalogEntry(
         id="fulfulde-proverbes-vol1",
         language="fulfulde",
         content_type="proverbes",
