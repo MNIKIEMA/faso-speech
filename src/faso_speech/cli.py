@@ -8,6 +8,7 @@ import typer
 from faso_speech.archive import archive_entries
 from faso_speech.catalog import list_entries
 from faso_speech.extraction import extract_timed
+from faso_speech.review_ui import run_review_ui
 from faso_speech.status import summarize_index
 
 
@@ -104,3 +105,13 @@ def status(input_index: Annotated[Path, typer.Option("--input-index")]) -> None:
             f"audio={row['audio_found']} timings={row['timings_found']} "
             f"statuses={row['statuses']}"
         )
+
+
+@app.command()
+def review(
+    metadata: Annotated[Path, typer.Argument(help="Processed metadata CSV to review.")],
+    host: Annotated[str, typer.Option("--host")] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port")] = 8050,
+    debug: bool = False,
+) -> None:
+    run_review_ui(metadata, host=host, port=port, debug=debug)

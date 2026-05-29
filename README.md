@@ -149,6 +149,12 @@ uv run faso-speech extract timed \
   --output-dir data/processed
 ```
 
+Review extracted candidate chunks in the local Dash UI:
+
+```bash
+uv run faso-speech review data/processed/metadata.csv
+```
+
 The older prototype commands are still present for compatibility:
 
 ```bash

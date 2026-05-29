@@ -6,10 +6,10 @@ when priorities change or a phase is completed.
 ## Priorities
 
 1. Moore Burkina content for Mooré, Dioula, and Fulfuldé.
-2. Bible sources with separate adapters for `jw.org` and `bible.com`, after the
-   Moore Burkina pipeline is stable.
-3. Dash-based local speech data explorer for review, after candidate metadata
-   exists.
+2. Dash-based local speech data explorer for review, after candidate metadata
+   exists and before adding new source families.
+3. Bible sources with separate adapters for `jw.org` and `bible.com`, after the
+   Moore Burkina pipeline and review loop are stable.
 4. Webonary dictionary and lexical audio, out of scope for the first version.
 
 The first usable dataset should come from Moore Burkina because the source
@@ -101,7 +101,39 @@ Definition of done:
 - Known problematic timing cases are marked `needs_review` or
   `timing_mismatch`.
 
-## Phase 3: Add Bible Sources
+## Phase 3: Add Dash Review UI
+
+Goal: create a local review interface as soon as Moore Burkina candidate chunk
+metadata exists, before adding Bible sources. The UI should make extraction
+quality visible so source parsing, timing cleanup, and metadata decisions are
+guided by real review feedback.
+
+Tasks:
+
+- Build a Dash-based speech data explorer inspired by NVIDIA NeMo Speech Data
+  Explorer.
+- Read processed metadata CSVs or derived JSONL manifests.
+- Show dataset statistics, sortable/filterable utterance tables, audio
+  playback, waveform/spectrogram views, source metadata columns, status editing,
+  and reviewer-note editing.
+- Keep accepted/rejected/needs-review statuses round-trippable back into
+  metadata files.
+- Add optional later columns for vocabulary/OOV summaries, character-rate
+  checks, audio peak/bandwidth estimates, and ASR prediction/error fields when
+  `pred_text` exists.
+
+Definition of done:
+
+- A local Dash app can open a processed metadata file and review candidate
+  chunks.
+- Reviewer status and notes can be saved without corrupting existing metadata.
+- The UI can filter by language, content type, source site, status, duration,
+  and review note.
+- Moore Burkina extraction issues discovered during review are captured as
+  parser warnings, metadata statuses, or follow-up fixes before Bible source
+  work begins.
+
+## Phase 4: Add Bible Sources
 
 Goal: add Bible/audio source support after the Moore Burkina pipeline is stable.
 Model `jw.org` and `bible.com` as separate source adapters under the shared
@@ -145,32 +177,6 @@ Definition of done:
 - Fulfuldé Burkina Bible.com coverage is probed and documented.
 - Gulimancema/Goulma Bible.com availability is documented but remains outside
   first-version processing.
-
-## Phase 4: Add Dash Review UI
-
-Goal: create a local review interface once candidate chunk metadata exists.
-
-Tasks:
-
-- Build a Dash-based speech data explorer inspired by NVIDIA NeMo Speech Data
-  Explorer.
-- Read processed metadata CSVs or derived JSONL manifests.
-- Show dataset statistics, sortable/filterable utterance tables, audio
-  playback, waveform/spectrogram views, source metadata columns, status editing,
-  and reviewer-note editing.
-- Keep accepted/rejected/needs-review statuses round-trippable back into
-  metadata files.
-- Add optional later columns for vocabulary/OOV summaries, character-rate
-  checks, audio peak/bandwidth estimates, and ASR prediction/error fields when
-  `pred_text` exists.
-
-Definition of done:
-
-- A local Dash app can open a processed metadata file and review candidate
-  chunks.
-- Reviewer status and notes can be saved without corrupting existing metadata.
-- The UI can filter by language, content type, source site, status, duration,
-  and review note.
 
 ## Later: Add Webonary
 
