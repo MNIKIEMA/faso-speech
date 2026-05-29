@@ -19,3 +19,5 @@ tmp/
 # environment variables
 .env
 tmp/
+data/
+datasets/
