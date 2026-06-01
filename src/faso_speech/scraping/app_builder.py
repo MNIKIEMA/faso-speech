@@ -6,6 +6,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from faso_speech.language import looks_french
+
 
 USER_AGENT = "Mozilla/5.0"
 
@@ -69,8 +71,8 @@ def clean_html_text(fragment):
     return " ".join(html.unescape(fragment).split())
 
 
-def infer_language_from_fragment(fragment):
-    if "bdit" in fragment:
+def infer_language_from_fragment(fragment, text):
+    if "bdit" in fragment and looks_french(text):
         return "french"
     return ""
 
@@ -84,11 +86,12 @@ def parse_text_blocks(document):
         flags=re.DOTALL,
     ):
         body = match.group("body")
+        text = clean_html_text(body)
         blocks.append(
             {
                 "label": match.group("label"),
-                "language_hint": infer_language_from_fragment(body),
-                "text": clean_html_text(body),
+                "language_hint": infer_language_from_fragment(match.group(0), text),
+                "text": text,
             }
         )
     return blocks

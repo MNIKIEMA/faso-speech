@@ -68,6 +68,9 @@ def parse_filter(filter_expr: str) -> dict[str, str]:
 
 def processing_language(text_row: dict[str, str], record: dict[str, str]) -> tuple[str, str]:
     raw_language = text_row.get("language") or record["language"]
+    if text_row.get("language"):
+        return raw_language, ""
+
     inferred_language = infer_text_language(text_row["text"], record["language"])
     if raw_language != inferred_language:
         return inferred_language, f"language_reclassified:{raw_language}->{inferred_language}"
