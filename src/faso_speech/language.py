@@ -9,10 +9,34 @@ WORD_PATTERN = re.compile(r"[^\W\d_]+(?:[’'][^\W\d_]+)?", re.UNICODE)
 FRENCH_WORD_PATTERN = re.compile(
     r"\b("
     r"au|aux|avec|bien|bon|bonne|car|ce|cela|celle|celui|chez|comme|dans|"
-    r"de|des|du|elle|est|et|il|je|le|les|leur|lui|mais|non|nous|on|ou|"
-    r"par|pas|pour|que|qui|sa|sais|se|ses|son|sur|tu|un|une|vous"
+    r"chaque|comment|de|des|dit|doucement|du|elle|enfant|est|et|fait|finit|fois|"
+    r"il|je|jour|la|le|les|leur|lui|mais|mon|monde|ne|non|nous|on|ou|"
+    r"oui|par|pareils|pas|personne|plein|pleure|poule|pour|quand|que|qui|"
+    r"sa|sais|scorpion|se|ses|si|singe|sommes|son|sortie|sur|ton|"
+    r"travailler|tu|un|une|va|ventre|vous"
     r")\b",
     re.IGNORECASE,
+)
+SHORT_FRENCH_WORD_PATTERN = re.compile(
+    r"^\W*(?:doucement|singe)\W*$",
+    re.IGNORECASE | re.UNICODE,
+)
+SHORT_FRENCH_PHRASE_PATTERN = re.compile(
+    r"^\W*(?:"
+    r"oui|"
+    r"chaque\s+jour|"
+    r"elle\s+dit|"
+    r"(?:su\s+r|sur)\s+ce\s+fait|"
+    r"sommes[-\s]+nous\s+[^\W\d_]+|"
+    r"une\s+fois\s+[^\W\d_]+|"
+    r"quand\s+.+|"
+    r"un\s+jour|"
+    r"si\s+non|"
+    r"(?:le|la|les|un|une)\s+[^\W\d_]+\s+[^\W\d_]+|"
+    r"(?:le|la|les|un|une)\s+[^\W\d_]+(?:\s+et\s+(?:le|la|les|un|une)\s+[^\W\d_]+)?|"
+    r"(?:ton|ta|son|sa|mon|ma)\s+[^\W\d_]+\s+est\s+[^\W\d_]+"
+    r")\W*$",
+    re.IGNORECASE | re.UNICODE,
 )
 FRENCH_ACCENT_PATTERN = re.compile(r"[àâçéèêëîïôùûüœ]", re.IGNORECASE)
 FRENCH_CONTRACTION_PATTERN = re.compile(
@@ -38,6 +62,9 @@ WEAK_FRENCH_WORDS = {
 
 
 def looks_french(text: str) -> bool:
+    # TODO: Replace this growing phrase list with page-structure aware language
+    # inference. Short fragments like "singe" or "Elle dit" need neighboring
+    # blocks/translation order to classify robustly, not only word matching.
     words = WORD_PATTERN.findall(text.lower())
     if not words:
         return False
@@ -50,7 +77,9 @@ def looks_french(text: str) -> bool:
         return False
 
     return (
-        len(strong_french_words) >= 2
+        bool(SHORT_FRENCH_WORD_PATTERN.fullmatch(text))
+        or bool(SHORT_FRENCH_PHRASE_PATTERN.fullmatch(text))
+        or len(strong_french_words) >= 2
         or len(french_words) >= 4
         or (len(strong_french_words) >= 1 and len(french_words) >= 3)
         or bool(FRENCH_CONTRACTION_PATTERN.search(text))
@@ -64,7 +93,7 @@ def infer_app_builder_language(
     text: str,
     source_language: Language,
 ) -> Language:
-    if "bdit" in node_html and looks_french(text):
+    if looks_french(text):
         return "french"
     return source_language
 

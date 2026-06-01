@@ -72,7 +72,7 @@ def clean_html_text(fragment):
 
 
 def infer_language_from_fragment(fragment, text):
-    if "bdit" in fragment and looks_french(text):
+    if looks_french(text):
         return "french"
     return ""
 

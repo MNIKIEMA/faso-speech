@@ -25,6 +25,30 @@ def test_french_translation_with_function_words_is_french():
     assert infer_text_language(text, "moore") == "french"
 
 
+def test_short_french_dioula_fragments_are_french():
+    texts = [
+        "La poule et le scorpion",
+        "Un jour,",
+        "Oui !",
+        "ton ventre est plein,",
+        "si non,",
+        "Une fois sortie,",
+        "singe,",
+        "Chaque jour,",
+        "Quand elle finit de travailler,",
+        "personne ne sait comment le monde va finir mon enfant .»",
+        "doucement,",
+        "Su r ce fait,",
+        "le lionceau pleure.",
+        "Elle dit :",
+        "sommes-nous pareils ?",
+    ]
+
+    for text in texts:
+        assert looks_french(text)
+        assert infer_text_language(text, "dioula") == "french"
+
+
 def test_legacy_app_builder_scraper_does_not_trust_bdit_alone():
     html = """
     <div id="T1" class="txs bdit">n le wẽ yɛsa:</div>
@@ -35,6 +59,27 @@ def test_legacy_app_builder_scraper_does_not_trust_bdit_alone():
         {"label": "1", "language_hint": "", "text": "n le wẽ yɛsa:"},
         {"label": "2", "language_hint": "french", "text": "C'est bon."},
     ]
+
+
+def test_app_builder_marks_french_without_bdit_hint():
+    assert (
+        infer_app_builder_language(
+            node_html='<div class="txs" id="T2">C est un bon repas.</div>',
+            text="C est un bon repas.",
+            source_language="dioula",
+        )
+        == "french"
+    )
+
+
+def test_extraction_reclassifies_archived_dioula_french_text():
+    language, review_note = processing_language(
+        {"language": "dioula", "text": "C est un bon repas."},
+        {"language": "dioula"},
+    )
+
+    assert language == "french"
+    assert review_note == "language_reclassified:dioula->french"
 
 
 def test_extraction_trusts_archived_text_language():
