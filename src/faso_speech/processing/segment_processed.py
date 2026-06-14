@@ -5,11 +5,13 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
+from faso_speech.audio import audio_duration
 from faso_speech.processing.segment import run_inaspeechsegmenter
 from faso_speech.processing.segment_dataset import write_segments_csv
 
 
 AUDIO_SUFFIXES = {".flac", ".m4a", ".mp3", ".ogg", ".wav"}
+MIN_SEGMENTER_DURATION_SECONDS = 0.72
 
 
 @dataclass(frozen=True)
@@ -142,6 +144,7 @@ def segment_processed_tree(
     refresh: bool = False,
     dry_run: bool = False,
     limit: int = 0,
+    min_duration: float = MIN_SEGMENTER_DURATION_SECONDS,
 ) -> int:
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
@@ -161,6 +164,10 @@ def segment_processed_tree(
             continue
         if job.output_csv.exists() and not refresh:
             print(f"skip_existing\t{job.output_csv}")
+            continue
+        duration = audio_duration(job.audio_path)
+        if duration < min_duration:
+            print(f"skip_short\t{job.audio_path}\tduration={duration:.3f}")
             continue
         if dry_run:
             print(f"would_segment\t{job.audio_path}\t{job.output_csv}")
@@ -217,6 +224,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Maximum number of jobs to process. Default: no limit.",
     )
+    parser.add_argument(
+        "--min-duration",
+        type=float,
+        default=MIN_SEGMENTER_DURATION_SECONDS,
+        help="Skip audio shorter than this many seconds. Default: 0.72.",
+    )
     return parser.parse_args()
 
 
@@ -230,6 +243,7 @@ def main() -> None:
         refresh=args.refresh,
         dry_run=args.dry_run,
         limit=args.limit,
+        min_duration=args.min_duration,
     )
     print(f"segmentation_jobs={count}")
 

@@ -124,6 +124,7 @@ def preprocess_segments(
     refresh: bool = False,
     dry_run: bool = False,
     limit: int = 0,
+    min_duration: float = 0.72,
 ) -> None:
     count = segment_processed_tree(
         input_dir,
@@ -133,6 +134,7 @@ def preprocess_segments(
         refresh=refresh,
         dry_run=dry_run,
         limit=limit,
+        min_duration=min_duration,
     )
     typer.echo(f"segmentation_jobs={count}")
 

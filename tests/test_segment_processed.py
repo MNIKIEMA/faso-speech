@@ -1,5 +1,6 @@
 import csv
 
+import faso_speech.processing.segment_processed as segment_processed
 from faso_speech.processing.segment_processed import discover_segmentation_jobs
 
 
@@ -114,3 +115,36 @@ def test_discover_segmentation_jobs_filters_metadata_by_language_and_content_typ
         "dioula-contes-001.segments.csv",
         "moore-contes-001.segments.csv",
     ]
+
+
+def test_segment_processed_tree_skips_short_audio(tmp_path, monkeypatch, capsys):
+    processed = tmp_path / "processed"
+    chunk_audio = processed / "moore" / "contes" / "timed_chunks" / "chunks" / "short.wav"
+    chunk_audio.parent.mkdir(parents=True)
+    chunk_audio.write_bytes(b"")
+    metadata = processed / "metadata.csv"
+    with metadata.open("w", newline="", encoding="utf-8") as output_file:
+        writer = csv.DictWriter(
+            output_file,
+            fieldnames=["chunk_audio", "language", "content_type", "chunk_id"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "chunk_audio": str(chunk_audio),
+                "language": "moore",
+                "content_type": "contes",
+                "chunk_id": "short",
+            }
+        )
+
+    def fail_segmenter(_audio_path):
+        raise AssertionError("segmenter should not run for short audio")
+
+    monkeypatch.setattr(segment_processed, "audio_duration", lambda _path: 0.5)
+    monkeypatch.setattr(segment_processed, "run_inaspeechsegmenter", fail_segmenter)
+
+    count = segment_processed.segment_processed_tree(processed)
+
+    assert count == 0
+    assert "skip_short" in capsys.readouterr().out
