@@ -1,22 +1,25 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
 from faso_speech.archive import archive_entries
 from faso_speech.catalog import list_entries
 from faso_speech.extraction import extract_timed
+from faso_speech.processing.segment_processed import segment_processed_tree
+from faso_speech.processing.segment_dataset import prepare_segmented_dataset
 from faso_speech.review_ui import run_review_ui
 from faso_speech.status import summarize_index
-
 
 app = typer.Typer(help="Build reproducible Burkina Faso speech datasets.")
 catalog_app = typer.Typer(help="Inspect source catalog entries.")
 extract_app = typer.Typer(help="Extract candidate chunks from archived data.")
+preprocess_app = typer.Typer(help="Prepare chunks and metadata for training/upload.")
 app.add_typer(catalog_app, name="catalog")
 app.add_typer(extract_app, name="extract")
+app.add_typer(preprocess_app, name="preprocess")
 
 
 @catalog_app.command("list")
@@ -81,6 +84,57 @@ def extract_timed_command(
 @extract_app.command("untimed")
 def extract_untimed() -> None:
     typer.echo("extract untimed is not implemented yet")
+
+
+@preprocess_app.command("hf-training")
+def preprocess_hf_training(
+    audio: Annotated[Path, typer.Option("--audio")],
+    text: Annotated[Path, typer.Option("--text")],
+    output_dir: Annotated[Path, typer.Option("--output-dir")],
+    segments: Annotated[Path | None, typer.Option("--segments")] = None,
+    language: Annotated[Literal["moore", "fulfulde", "dioula"], typer.Option("--language")] = "moore",
+    audio_format: Annotated[str, typer.Option("--audio-format")] = "wav",
+    start_padding: float = 0.15,
+    end_padding: float = 0.15,
+    min_char_per_second: float = 0.0,
+    max_char_per_second: float = 0.0,
+) -> None:
+    count = prepare_segmented_dataset(
+        audio_path=audio,
+        text_path=text,
+        output_dir=output_dir,
+        segments_path=segments,
+        language=language,
+        audio_format=audio_format,
+        start_padding=start_padding,
+        end_padding=end_padding,
+        min_char_per_second=min_char_per_second,
+        max_char_per_second=max_char_per_second,
+    )
+    typer.echo(f"training_rows={count}")
+    typer.echo(f"metadata={output_dir / 'metadata.csv'}")
+
+
+@preprocess_app.command("segments")
+def preprocess_segments(
+    input_dir: Annotated[Path, typer.Option("--input-dir")] = Path("data/processed"),
+    metadata: Annotated[Path | None, typer.Option("--metadata")] = None,
+    language: Annotated[list[str] | None, typer.Option("--language")] = None,
+    content_type: Annotated[list[str] | None, typer.Option("--content-type")] = None,
+    refresh: bool = False,
+    dry_run: bool = False,
+    limit: int = 0,
+) -> None:
+    count = segment_processed_tree(
+        input_dir,
+        metadata_path=metadata,
+        languages=set(language or []),
+        content_types=set(content_type or []),
+        refresh=refresh,
+        dry_run=dry_run,
+        limit=limit,
+    )
+    typer.echo(f"segmentation_jobs={count}")
 
 
 @app.command()

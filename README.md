@@ -170,6 +170,35 @@ uv run faso-align-contes-segments \
   --text path/to/file.txt
 ```
 
+Run segmentation for a processed tree:
+
+```bash
+uv run faso-speech preprocess segments \
+  --input-dir data/processed \
+  --language moore
+```
+
+This reads `data/processed/metadata.csv`, segments each unique `chunk_audio`,
+and writes reusable segment CSVs under
+`data/processed/<language>/<content_type>/segments/`. Use `--language` and
+`--content-type` to scope a run, and `--dry-run` to preview the jobs first.
+
+Prepare segmented training audio for Hugging Face upload:
+
+```bash
+uv run faso-speech preprocess hf-training \
+  --audio path/to/source.mp3 \
+  --text path/to/transcript.txt \
+  --output-dir data/hf/moore-contes \
+  --language moore
+```
+
+If `--segments` is omitted, the command runs `inaSpeechSegmenter` and writes the
+generated segment CSV next to `metadata.csv`. The output folder contains
+`chunks/` audio plus a Hugging Face-friendly `metadata.csv` with `file_name`,
+`text`, `language`, `duration`, and `char_per_second`. Transcript lines that
+start with a digit have that leading digit removed before export.
+
 Add dependencies with:
 
 ```bash
