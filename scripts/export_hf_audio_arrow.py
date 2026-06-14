@@ -29,6 +29,14 @@ AUDIO_PA_TYPE = pa.struct(
         pa.field("path", pa.string()),
     ]
 )
+TRAINING_COLUMNS = [
+    "text",
+    "language",
+    "duration",
+    "chunk_id",
+    "record_id",
+    "content_type",
+]
 
 
 def read_metadata(metadata_path: Path) -> list[dict[str, str]]:
@@ -88,6 +96,8 @@ def build_dataset(
     audio_column: str = "audio",
     languages: set[str] | None = None,
     content_types: set[str] | None = None,
+    metadata_columns: list[str] | None = None,
+    include_all_metadata: bool = False,
     limit: int = 0,
 ) -> Dataset:
     metadata_path = input_dir / metadata_name
@@ -105,7 +115,10 @@ def build_dataset(
         raise SystemExit(f"No matching rows found in {metadata_path}")
 
     columns: dict[str, list[object]] = {audio_column: []}
-    metadata_columns = [column for column in rows[0] if column != file_column]
+    if include_all_metadata:
+        metadata_columns = [column for column in rows[0] if column != file_column]
+    elif metadata_columns is None:
+        metadata_columns = [column for column in TRAINING_COLUMNS if column in rows[0]]
     for column in metadata_columns:
         columns[column] = []
 
@@ -203,6 +216,16 @@ def parse_args() -> argparse.Namespace:
         action="append",
         help="Keep only this content type. May be repeated.",
     )
+    parser.add_argument(
+        "--column",
+        action="append",
+        help="Metadata column to keep. May be repeated. Default: training columns only.",
+    )
+    parser.add_argument(
+        "--include-all-metadata",
+        action="store_true",
+        help="Keep every metadata column instead of the default training columns.",
+    )
     parser.add_argument("--limit", type=int, default=0, help="Maximum rows to export. Default: all.")
     parser.add_argument(
         "--audio-column",
@@ -260,6 +283,8 @@ def main() -> None:
         audio_column=args.audio_column,
         languages=set(args.language or []),
         content_types=set(args.content_type or []),
+        metadata_columns=args.column,
+        include_all_metadata=args.include_all_metadata,
         limit=args.limit,
     )
     splits = split_dataset(

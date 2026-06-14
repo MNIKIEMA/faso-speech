@@ -224,6 +224,37 @@ each audio as `{"bytes": ..., "path": ...}`, and writes a deterministic 90%
 `train` / 10% `validation` split by default. It can also push directly with
 `--repo-id`.
 
+The default export is intentionally small for ASR training:
+
+| Column | Purpose |
+| --- | --- |
+| `audio` | Embedded `Audio(decode=False)` value with `bytes` and `path` |
+| `text` | Transcript |
+| `language` | Language label |
+| `duration` | Chunk duration from metadata |
+| `chunk_id` | Stable chunk identifier |
+| `record_id` | Source record identifier |
+| `content_type` | Source content type |
+
+To add specific metadata columns, repeat `--column`:
+
+```bash
+uv run scripts/export_hf_audio_arrow.py data/processed \
+  --language moore \
+  --column text \
+  --column language \
+  --column duration \
+  --column source_url
+```
+
+For a provenance/debug export with every metadata column, use:
+
+```bash
+uv run scripts/export_hf_audio_arrow.py data/processed \
+  --language moore \
+  --include-all-metadata
+```
+
 Use one Hugging Face config per dataset:
 
 ```bash
