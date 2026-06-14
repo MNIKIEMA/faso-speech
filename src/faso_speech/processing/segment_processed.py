@@ -8,12 +8,12 @@ from pathlib import Path
 from faso_speech.audio import audio_duration
 from faso_speech.io import write_and_rename
 from faso_speech.processing.segment import run_inaspeechsegmenter
-from faso_speech.processing.segment_dataset import write_segments_csv
 
 
 AUDIO_SUFFIXES = {".flac", ".m4a", ".mp3", ".ogg", ".wav"}
 MIN_SEGMENTER_DURATION_SECONDS = 0.72
 LOG_COLUMNS = ["status", "audio_path", "output_csv", "duration", "segments", "message"]
+SEGMENT_COLUMNS = ["label", "start", "end", "duration"]
 
 
 @dataclass(frozen=True)
@@ -147,6 +147,13 @@ def safe_audio_duration(audio_path: Path) -> float | None:
 def write_log(path: Path, rows: list[dict[str, object]]) -> None:
     with write_and_rename(path, "w", newline="", encoding="utf-8") as output_file:
         writer = csv.DictWriter(output_file, fieldnames=LOG_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def write_segments_csv(path: Path, rows: list[dict[str, float | str]]) -> None:
+    with write_and_rename(path, "w", newline="", encoding="utf-8") as output_file:
+        writer = csv.DictWriter(output_file, fieldnames=SEGMENT_COLUMNS)
         writer.writeheader()
         writer.writerows(rows)
 

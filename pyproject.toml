@@ -21,9 +21,7 @@ build-backend = "hatchling.build"
 faso-speech = "faso_speech.cli:app"
 faso-align-contes-segments = "faso_speech.processing.align_contes_segments:main"
 faso-extract-timed-contes = "faso_speech.processing.extract_timed_contes_chunks:main"
-faso-segment-dataset = "faso_speech.processing.segment_dataset:main"
 faso-segment-processed = "faso_speech.processing.segment_processed:main"
-faso-prepare-hf-training = "faso_speech.processing.segment_dataset:main"
 faso-scrape-raw = "faso_speech.scraping.raw_archive:main"
 
 [dependency-groups]

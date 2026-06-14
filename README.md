@@ -192,22 +192,6 @@ Current processed audio totals from `data/processed/metadata.csv`:
 | dioula | 1,073 | 00:49:45.910 | 26 |
 | french | 212 | 00:12:23.400 | 4 |
 
-Prepare segmented training audio for Hugging Face upload:
-
-```bash
-uv run faso-speech preprocess hf-training \
-  --audio path/to/source.mp3 \
-  --text path/to/transcript.txt \
-  --output-dir data/hf/moore-contes \
-  --language moore
-```
-
-If `--segments` is omitted, the command runs `inaSpeechSegmenter` and writes the
-generated segment CSV next to `metadata.csv`. The output folder contains
-`chunks/` audio plus a Hugging Face-friendly `metadata.csv` with `file_name`,
-`text`, `language`, `duration`, and `char_per_second`. Transcript lines that
-start with a digit have that leading digit removed before export.
-
 To build an embedded Hugging Face `Audio(decode=False)` dataset without
 TorchCodec, use the optional Arrow export helper. It can read either an export
 folder with `file_name` metadata or `data/processed` with `chunk_audio`
