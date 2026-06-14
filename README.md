@@ -208,6 +208,19 @@ each audio as `{"bytes": ..., "path": ...}`, and writes a deterministic 90%
 `train` / 10% `validation` split by default. It can also push directly with
 `--repo-id`.
 
+When a matching segment CSV exists, the helper applies it in memory during
+export: only `speech` ranges are embedded in the Hugging Face audio bytes, and
+the source audio file is left unchanged. Rows without segment CSVs are still
+exported with their original audio. Use `--no-apply-segments` to ignore segment
+CSVs.
+
+Segment-aware export keeps real audio padding around speech by default:
+`--segment-start-padding 0.15` and `--segment-end-padding 0.25`. Padding into
+music is limited to `--music-start-padding 0.05` and `--music-end-padding 0.05`
+to avoid clipping words without retaining music beds. Speech ranges separated
+by short non-music gaps are merged with `--max-intra-segment-gap 0.50`; music
+gaps are merged only when tiny, with `--max-music-gap 0.05`.
+
 The default export is intentionally small for ASR training:
 
 | Column | Purpose |

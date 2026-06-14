@@ -12,6 +12,7 @@ import argparse
 import csv
 import os
 import random
+import subprocess
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -37,6 +38,12 @@ TRAINING_COLUMNS = [
     "record_id",
     "content_type",
 ]
+SEGMENT_START_PADDING = 0.15
+SEGMENT_END_PADDING = 0.25
+MUSIC_START_PADDING = 0.05
+MUSIC_END_PADDING = 0.05
+MAX_INTRA_SEGMENT_GAP = 0.50
+MAX_MUSIC_GAP = 0.05
 
 
 def read_metadata(metadata_path: Path) -> list[dict[str, str]]:
@@ -69,7 +76,6 @@ def filter_rows(
             continue
         if content_types and row.get("content_type") not in content_types:
             continue
-        # TODO: Skip rows shorter than 0.72 seconds by default, matching segmentation.
         filtered.append(row)
         if limit > 0 and len(filtered) >= limit:
             break
@@ -88,6 +94,228 @@ def resolve_audio_path(input_dir: Path, path_value: str) -> Path:
     raise FileNotFoundError(f"Audio file not found: {path_value}")
 
 
+def normalize_segment_label(label: str) -> str:
+    normalized = label.strip()
+    if normalized in {"speech", "male", "female"}:
+        return "speech"
+    if normalized.lower() in {"noenergy", "no_energy", "silence"}:
+        return "noise"
+    return normalized
+
+
+def resolve_segments_path(input_dir: Path, row: dict[str, str], audio_path: Path) -> Path | None:
+    candidates = []
+    chunk_id = row.get("chunk_id", "").strip()
+    language = row.get("language", "").strip()
+    content_type = row.get("content_type", "").strip()
+    if chunk_id and language and content_type:
+        candidates.append(input_dir / language / content_type / "segments" / f"{chunk_id}.segments.csv")
+    candidates.append(audio_path.with_suffix(".segments.csv"))
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def read_segments(segments_path: Path) -> list[dict[str, float | str]]:
+    segments = []
+    with segments_path.open(newline="", encoding="utf-8") as segments_file:
+        for row in csv.DictReader(segments_file):
+            label = normalize_segment_label(row.get("label", ""))
+            start = float(row["start"])
+            end = float(row["end"])
+            if end <= start:
+                continue
+            segments.append({"label": label, "start": start, "end": end})
+    return segments
+
+
+def padded_speech_ranges(
+    segments: list[dict[str, float | str]],
+    *,
+    start_padding: float,
+    end_padding: float,
+    music_start_padding: float,
+    music_end_padding: float,
+) -> list[tuple[float, float]]:
+    ranges = []
+    for index, segment in enumerate(segments):
+        if segment["label"] != "speech":
+            continue
+        start = float(segment["start"])
+        end = float(segment["end"])
+        previous_segment = segments[index - 1] if index > 0 else None
+        next_segment = segments[index + 1] if index + 1 < len(segments) else None
+
+        effective_start_padding = start_padding
+        if previous_segment and previous_segment["label"] == "music":
+            effective_start_padding = min(start_padding, music_start_padding)
+
+        effective_end_padding = end_padding
+        if next_segment and next_segment["label"] == "music":
+            effective_end_padding = min(end_padding, music_end_padding)
+
+        ranges.append((max(0.0, start - effective_start_padding), end + effective_end_padding))
+    return ranges
+
+
+def labels_between(
+    segments: list[dict[str, float | str]],
+    start: float,
+    end: float,
+) -> set[str]:
+    labels = set()
+    for segment in segments:
+        segment_start = float(segment["start"])
+        segment_end = float(segment["end"])
+        if segment_end <= start or segment_start >= end:
+            continue
+        labels.add(str(segment["label"]))
+    return labels
+
+
+def merge_ranges(
+    ranges: list[tuple[float, float]],
+    segments: list[dict[str, float | str]],
+    *,
+    max_intra_segment_gap: float,
+    max_music_gap: float,
+) -> list[tuple[float, float]]:
+    if not ranges:
+        return []
+
+    merged = [ranges[0]]
+    for start, end in ranges[1:]:
+        previous_start, previous_end = merged[-1]
+        gap = start - previous_end
+        if gap <= 0:
+            merged[-1] = (previous_start, max(previous_end, end))
+            continue
+
+        gap_labels = labels_between(segments, previous_end, start)
+        max_gap = max_music_gap if "music" in gap_labels else max_intra_segment_gap
+        if gap <= max_gap:
+            merged[-1] = (previous_start, end)
+            continue
+
+        merged.append((start, end))
+    return merged
+
+
+def export_ranges_from_segments(
+    segments_path: Path,
+    *,
+    start_padding: float,
+    end_padding: float,
+    music_start_padding: float,
+    music_end_padding: float,
+    max_intra_segment_gap: float,
+    max_music_gap: float,
+) -> list[tuple[float, float]]:
+    segments = read_segments(segments_path)
+    ranges = padded_speech_ranges(
+        segments,
+        start_padding=start_padding,
+        end_padding=end_padding,
+        music_start_padding=music_start_padding,
+        music_end_padding=music_end_padding,
+    )
+    return merge_ranges(
+        ranges,
+        segments,
+        max_intra_segment_gap=max_intra_segment_gap,
+        max_music_gap=max_music_gap,
+    )
+
+
+def segment_audio_bytes(audio_path: Path, ranges: list[tuple[float, float]]) -> bytes:
+    if not ranges:
+        raise ValueError("At least one speech range is required.")
+
+    trim_filters = []
+    concat_inputs = []
+    for index, (start, end) in enumerate(ranges):
+        trim_filters.append(
+            f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{index}]"
+        )
+        concat_inputs.append(f"[a{index}]")
+    filter_complex = (
+        ";".join(trim_filters)
+        + ";"
+        + "".join(concat_inputs)
+        + f"concat=n={len(ranges)}:v=0:a=1[out]"
+    )
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(audio_path),
+        "-filter_complex",
+        filter_complex,
+        "-map",
+        "[out]",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-f",
+        "wav",
+        "pipe:1",
+    ]
+    result = subprocess.run(command, check=True, capture_output=True)
+    return result.stdout
+
+
+def audio_payload(
+    input_dir: Path,
+    row: dict[str, str],
+    audio_path: Path,
+    relative_path: str,
+    *,
+    apply_segments: bool,
+    segment_start_padding: float = SEGMENT_START_PADDING,
+    segment_end_padding: float = SEGMENT_END_PADDING,
+    music_start_padding: float = MUSIC_START_PADDING,
+    music_end_padding: float = MUSIC_END_PADDING,
+    max_intra_segment_gap: float = MAX_INTRA_SEGMENT_GAP,
+    max_music_gap: float = MAX_MUSIC_GAP,
+) -> tuple[dict[str, bytes | str], dict[str, str]]:
+    if not apply_segments:
+        return {"bytes": audio_path.read_bytes(), "path": Path(relative_path).name}, row
+
+    segments_path = resolve_segments_path(input_dir, row, audio_path)
+    if not segments_path:
+        return {"bytes": audio_path.read_bytes(), "path": Path(relative_path).name}, row
+
+    export_ranges = export_ranges_from_segments(
+        segments_path,
+        start_padding=segment_start_padding,
+        end_padding=segment_end_padding,
+        music_start_padding=music_start_padding,
+        music_end_padding=music_end_padding,
+        max_intra_segment_gap=max_intra_segment_gap,
+        max_music_gap=max_music_gap,
+    )
+    if not export_ranges:
+        return {"bytes": audio_path.read_bytes(), "path": Path(relative_path).name}, row
+
+    export_row = dict(row)
+    speech_duration = sum(end - start for start, end in export_ranges)
+    if "duration" in export_row:
+        export_row["duration"] = str(round(speech_duration, 3))
+
+    return (
+        {
+            "bytes": segment_audio_bytes(audio_path, export_ranges),
+            "path": f"{Path(relative_path).stem}.segmented.wav",
+        },
+        export_row,
+    )
+
+
 def build_dataset(
     input_dir: Path,
     *,
@@ -99,6 +327,13 @@ def build_dataset(
     metadata_columns: list[str] | None = None,
     include_all_metadata: bool = False,
     limit: int = 0,
+    apply_segments: bool = True,
+    segment_start_padding: float = SEGMENT_START_PADDING,
+    segment_end_padding: float = SEGMENT_END_PADDING,
+    music_start_padding: float = MUSIC_START_PADDING,
+    music_end_padding: float = MUSIC_END_PADDING,
+    max_intra_segment_gap: float = MAX_INTRA_SEGMENT_GAP,
+    max_music_gap: float = MAX_MUSIC_GAP,
 ) -> Dataset:
     metadata_path = input_dir / metadata_name
     rows = read_metadata(metadata_path)
@@ -125,15 +360,23 @@ def build_dataset(
     for row in rows:
         relative_path = row[file_column]
         audio_path = resolve_audio_path(input_dir, relative_path)
-
-        columns[audio_column].append(
-            {
-                "bytes": audio_path.read_bytes(),
-                "path": Path(relative_path).name,
-            }
+        payload, export_row = audio_payload(
+            input_dir,
+            row,
+            audio_path,
+            relative_path,
+            apply_segments=apply_segments,
+            segment_start_padding=segment_start_padding,
+            segment_end_padding=segment_end_padding,
+            music_start_padding=music_start_padding,
+            music_end_padding=music_end_padding,
+            max_intra_segment_gap=max_intra_segment_gap,
+            max_music_gap=max_music_gap,
         )
+
+        columns[audio_column].append(payload)
         for column in metadata_columns:
-            columns[column].append(row[column])
+            columns[column].append(export_row[column])
 
     arrow_columns = {
         audio_column: pa.array(columns[audio_column], type=AUDIO_PA_TYPE),
@@ -233,6 +476,47 @@ def parse_args() -> argparse.Namespace:
         help="Output Audio column name. Default: audio.",
     )
     parser.add_argument(
+        "--no-apply-segments",
+        action="store_true",
+        help="Ignore segment CSVs and export original audio bytes.",
+    )
+    parser.add_argument(
+        "--segment-start-padding",
+        type=float,
+        default=SEGMENT_START_PADDING,
+        help="Seconds of real audio to keep before speech. Default: 0.15.",
+    )
+    parser.add_argument(
+        "--segment-end-padding",
+        type=float,
+        default=SEGMENT_END_PADDING,
+        help="Seconds of real audio to keep after speech. Default: 0.25.",
+    )
+    parser.add_argument(
+        "--music-start-padding",
+        type=float,
+        default=MUSIC_START_PADDING,
+        help="Maximum seconds to pad into music before speech. Default: 0.05.",
+    )
+    parser.add_argument(
+        "--music-end-padding",
+        type=float,
+        default=MUSIC_END_PADDING,
+        help="Maximum seconds to pad into music after speech. Default: 0.05.",
+    )
+    parser.add_argument(
+        "--max-intra-segment-gap",
+        type=float,
+        default=MAX_INTRA_SEGMENT_GAP,
+        help="Keep non-music gaps between speech ranges up to this many seconds. Default: 0.50.",
+    )
+    parser.add_argument(
+        "--max-music-gap",
+        type=float,
+        default=MAX_MUSIC_GAP,
+        help="Keep music gaps between speech ranges up to this many seconds. Default: 0.05.",
+    )
+    parser.add_argument(
         "--output-parquet",
         type=Path,
         help="Optional Parquet directory to write train.parquet and validation.parquet.",
@@ -286,6 +570,13 @@ def main() -> None:
         metadata_columns=args.column,
         include_all_metadata=args.include_all_metadata,
         limit=args.limit,
+        apply_segments=not args.no_apply_segments,
+        segment_start_padding=args.segment_start_padding,
+        segment_end_padding=args.segment_end_padding,
+        music_start_padding=args.music_start_padding,
+        music_end_padding=args.music_end_padding,
+        max_intra_segment_gap=args.max_intra_segment_gap,
+        max_music_gap=args.max_music_gap,
     )
     splits = split_dataset(
         dataset,
