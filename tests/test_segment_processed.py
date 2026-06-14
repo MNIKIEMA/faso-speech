@@ -148,3 +148,84 @@ def test_segment_processed_tree_skips_short_audio(tmp_path, monkeypatch, capsys)
 
     assert count == 0
     assert "skip_short" in capsys.readouterr().out
+    with (processed / "segmentation_log.csv").open(newline="", encoding="utf-8") as input_file:
+        row = next(csv.DictReader(input_file))
+    assert row["status"] == "skip_short"
+    assert row["audio_path"] == str(chunk_audio)
+    assert row["duration"] == "0.5"
+
+
+def test_segment_processed_tree_skips_unknown_duration(tmp_path, monkeypatch, capsys):
+    processed = tmp_path / "processed"
+    chunk_audio = processed / "moore" / "contes" / "timed_chunks" / "chunks" / "unknown.wav"
+    chunk_audio.parent.mkdir(parents=True)
+    chunk_audio.write_bytes(b"")
+    metadata = processed / "metadata.csv"
+    with metadata.open("w", newline="", encoding="utf-8") as output_file:
+        writer = csv.DictWriter(
+            output_file,
+            fieldnames=["chunk_audio", "language", "content_type", "chunk_id"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "chunk_audio": str(chunk_audio),
+                "language": "moore",
+                "content_type": "contes",
+                "chunk_id": "unknown",
+            }
+        )
+
+    def fail_segmenter(_audio_path):
+        raise AssertionError("segmenter should not run without a duration")
+
+    monkeypatch.setattr(segment_processed, "audio_duration", lambda _path: float("N/A"))
+    monkeypatch.setattr(segment_processed, "run_inaspeechsegmenter", fail_segmenter)
+
+    count = segment_processed.segment_processed_tree(processed)
+
+    assert count == 0
+    assert "skip_unknown_duration" in capsys.readouterr().out
+    with (processed / "segmentation_log.csv").open(newline="", encoding="utf-8") as input_file:
+        row = next(csv.DictReader(input_file))
+    assert row["status"] == "skip_unknown_duration"
+    assert row["audio_path"] == str(chunk_audio)
+    assert row["duration"] == ""
+
+
+def test_segment_processed_tree_writes_custom_log_for_dry_run(tmp_path, monkeypatch):
+    processed = tmp_path / "processed"
+    chunk_audio = processed / "moore" / "contes" / "timed_chunks" / "chunks" / "chunk.wav"
+    chunk_audio.parent.mkdir(parents=True)
+    chunk_audio.write_bytes(b"")
+    metadata = processed / "metadata.csv"
+    with metadata.open("w", newline="", encoding="utf-8") as output_file:
+        writer = csv.DictWriter(
+            output_file,
+            fieldnames=["chunk_audio", "language", "content_type", "chunk_id"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "chunk_audio": str(chunk_audio),
+                "language": "moore",
+                "content_type": "contes",
+                "chunk_id": "chunk",
+            }
+        )
+
+    log_path = tmp_path / "logs" / "segments.csv"
+    monkeypatch.setattr(segment_processed, "audio_duration", lambda _path: 1.0)
+
+    count = segment_processed.segment_processed_tree(
+        processed,
+        dry_run=True,
+        log_path=log_path,
+    )
+
+    assert count == 1
+    with log_path.open(newline="", encoding="utf-8") as input_file:
+        row = next(csv.DictReader(input_file))
+    assert row["status"] == "would_segment"
+    assert row["audio_path"] == str(chunk_audio)
+    assert row["output_csv"].endswith("chunk.segments.csv")

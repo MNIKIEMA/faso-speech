@@ -5,6 +5,7 @@ import csv
 from pathlib import Path
 
 from faso_speech.audio import audio_duration, concat_audio_segments, cut_audio
+from faso_speech.io import write_and_rename
 from faso_speech.processing.segment import (
     assign_segments,
     flatten_pairs,
@@ -47,16 +48,14 @@ def apply_padding(
 
 
 def write_segments_csv(path: Path, rows: list[dict[str, float | str]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as output_file:
+    with write_and_rename(path, "w", newline="", encoding="utf-8") as output_file:
         writer = csv.DictWriter(output_file, fieldnames=SEGMENT_COLUMNS)
         writer.writeheader()
         writer.writerows(rows)
 
 
 def write_metadata(path: Path, rows: list[dict[str, object]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as output_file:
+    with write_and_rename(path, "w", newline="", encoding="utf-8") as output_file:
         writer = csv.DictWriter(output_file, fieldnames=METADATA_COLUMNS)
         writer.writeheader()
         writer.writerows(rows)

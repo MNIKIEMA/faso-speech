@@ -6,12 +6,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from faso_speech.audio import audio_duration
+from faso_speech.io import write_and_rename
 from faso_speech.processing.segment import run_inaspeechsegmenter
 from faso_speech.processing.segment_dataset import write_segments_csv
 
 
 AUDIO_SUFFIXES = {".flac", ".m4a", ".mp3", ".ogg", ".wav"}
 MIN_SEGMENTER_DURATION_SECONDS = 0.72
+LOG_COLUMNS = ["status", "audio_path", "output_csv", "duration", "segments", "message"]
 
 
 @dataclass(frozen=True)
@@ -135,6 +137,41 @@ def discover_segmentation_jobs(
     return jobs_from_audio_scan(input_dir, languages=languages, content_types=content_types)
 
 
+def safe_audio_duration(audio_path: Path) -> float | None:
+    try:
+        return audio_duration(audio_path)
+    except ValueError:
+        return None
+
+
+def write_log(path: Path, rows: list[dict[str, object]]) -> None:
+    with write_and_rename(path, "w", newline="", encoding="utf-8") as output_file:
+        writer = csv.DictWriter(output_file, fieldnames=LOG_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def log_row(
+    rows: list[dict[str, object]],
+    *,
+    status: str,
+    job: SegmentationJob,
+    duration: float | None = None,
+    segments: int | str = "",
+    message: str = "",
+) -> None:
+    rows.append(
+        {
+            "status": status,
+            "audio_path": str(job.audio_path),
+            "output_csv": str(job.output_csv),
+            "duration": "" if duration is None else round(duration, 3),
+            "segments": segments,
+            "message": message,
+        }
+    )
+
+
 def segment_processed_tree(
     input_dir: Path,
     *,
@@ -145,6 +182,7 @@ def segment_processed_tree(
     dry_run: bool = False,
     limit: int = 0,
     min_duration: float = MIN_SEGMENTER_DURATION_SECONDS,
+    log_path: Path | None = None,
 ) -> int:
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
@@ -155,30 +193,51 @@ def segment_processed_tree(
         languages=languages,
         content_types=content_types,
     )
-    written = 0
-    for job in jobs:
-        if limit and written >= limit:
-            break
-        if not job.audio_path.exists():
-            print(f"missing_audio\t{job.audio_path}")
-            continue
-        if job.output_csv.exists() and not refresh:
-            print(f"skip_existing\t{job.output_csv}")
-            continue
-        duration = audio_duration(job.audio_path)
-        if duration < min_duration:
-            print(f"skip_short\t{job.audio_path}\tduration={duration:.3f}")
-            continue
-        if dry_run:
-            print(f"would_segment\t{job.audio_path}\t{job.output_csv}")
-            written += 1
-            continue
+    processed = 0
+    log_rows: list[dict[str, object]] = []
+    log_path = log_path or input_dir / "segmentation_log.csv"
+    try:
+        for job in jobs:
+            if limit and processed >= limit:
+                break
+            if not job.audio_path.exists():
+                print(f"missing_audio\t{job.audio_path}")
+                log_row(log_rows, status="missing_audio", job=job)
+                continue
+            if job.output_csv.exists() and not refresh:
+                print(f"skip_existing\t{job.output_csv}")
+                log_row(log_rows, status="skip_existing", job=job)
+                continue
+            duration = safe_audio_duration(job.audio_path)
+            if duration is None:
+                print(f"skip_unknown_duration\t{job.audio_path}")
+                log_row(log_rows, status="skip_unknown_duration", job=job)
+                continue
+            if duration < min_duration:
+                print(f"skip_short\t{job.audio_path}\tduration={duration:.3f}")
+                log_row(log_rows, status="skip_short", job=job, duration=duration)
+                continue
+            if dry_run:
+                print(f"would_segment\t{job.audio_path}\t{job.output_csv}")
+                log_row(log_rows, status="would_segment", job=job, duration=duration)
+                processed += 1
+                continue
 
-        rows = run_inaspeechsegmenter(job.audio_path)
-        write_segments_csv(job.output_csv, rows)
-        print(f"segmented\t{job.audio_path}\t{job.output_csv}\tsegments={len(rows)}")
-        written += 1
-    return written
+            rows = run_inaspeechsegmenter(job.audio_path)
+            write_segments_csv(job.output_csv, rows)
+            print(f"segmented\t{job.audio_path}\t{job.output_csv}\tsegments={len(rows)}")
+            log_row(
+                log_rows,
+                status="segmented",
+                job=job,
+                duration=duration,
+                segments=len(rows),
+            )
+            processed += 1
+    finally:
+        write_log(log_path, log_rows)
+        print(f"segmentation_log={log_path}")
+    return processed
 
 
 def parse_args() -> argparse.Namespace:
@@ -230,6 +289,11 @@ def parse_args() -> argparse.Namespace:
         default=MIN_SEGMENTER_DURATION_SECONDS,
         help="Skip audio shorter than this many seconds. Default: 0.72.",
     )
+    parser.add_argument(
+        "--log",
+        type=Path,
+        help="CSV path for per-audio segmentation outcomes. Default: <input-dir>/segmentation_log.csv.",
+    )
     return parser.parse_args()
 
 
@@ -244,6 +308,7 @@ def main() -> None:
         dry_run=args.dry_run,
         limit=args.limit,
         min_duration=args.min_duration,
+        log_path=args.log,
     )
     print(f"segmentation_jobs={count}")
 
