@@ -183,6 +183,15 @@ and writes reusable segment CSVs under
 `data/processed/<language>/<content_type>/segments/`. Use `--language` and
 `--content-type` to scope a run, and `--dry-run` to preview the jobs first.
 
+Current processed audio totals from `data/processed/metadata.csv`:
+
+| Language | Rows | Duration | < 0.72s rows |
+| --- | ---: | ---: | ---: |
+| moore | 5,746 | 05:41:41.870 | 88 |
+| fulfulde | 2,260 | 02:41:47.140 | 103 |
+| dioula | 1,073 | 00:49:45.910 | 26 |
+| french | 212 | 00:12:23.400 | 4 |
+
 Prepare segmented training audio for Hugging Face upload:
 
 ```bash
@@ -198,6 +207,41 @@ generated segment CSV next to `metadata.csv`. The output folder contains
 `chunks/` audio plus a Hugging Face-friendly `metadata.csv` with `file_name`,
 `text`, `language`, `duration`, and `char_per_second`. Transcript lines that
 start with a digit have that leading digit removed before export.
+
+To build an embedded Hugging Face `Audio(decode=False)` dataset without
+TorchCodec, use the optional Arrow export helper. It can read either an export
+folder with `file_name` metadata or `data/processed` with `chunk_audio`
+metadata:
+
+```bash
+uv run scripts/export_hf_audio_arrow.py data/processed \
+  --language moore \
+  --output-parquet data/hf/moore/parquet
+```
+
+The helper reads `file_name` or `chunk_audio` paths from `metadata.csv`, stores
+each audio as `{"bytes": ..., "path": ...}`, and writes a deterministic 90%
+`train` / 10% `validation` split by default. It can also push directly with
+`--repo-id`.
+
+Use one Hugging Face config per dataset:
+
+```bash
+uv run scripts/export_hf_audio_arrow.py data/processed \
+  --repo-id madoss/faso-speech \
+  --config-name moore \
+  --language moore
+
+uv run scripts/export_hf_audio_arrow.py data/processed \
+  --repo-id madoss/faso-speech \
+  --config-name dioula \
+  --language dioula
+
+uv run scripts/export_hf_audio_arrow.py data/processed \
+  --repo-id madoss/faso-speech \
+  --config-name fulfulde \
+  --language fulfulde
+```
 
 Add dependencies with:
 
