@@ -48,6 +48,18 @@ COMMON_FEATURES = Features(
 )
 
 
+OMNILINGUAL_FULA_VARIANTS = {
+    "ffm": "Maasina Fulfulde",
+    "fuc": "Pulaar",
+    "fue": "Borgu Fulfulde",
+    "fuf": "Pular",
+    "fuh": "Western Niger Fulfulde",
+    "fui": "Bagirmi Fulfulde",
+    "fuq": "Central-Eastern Niger Fulfulde",
+    "fuv": "Nigerian Fulfulde",
+}
+
+
 @dataclass
 class ExternalSource:
     id: str
@@ -60,6 +72,7 @@ class ExternalSource:
     text_column: str
     license: str
     attribution: str
+    eval_splits: tuple[str, ...] = ()
     verified: bool = False
     notes: str = ""
 
@@ -132,6 +145,23 @@ MANIFEST: list[ExternalSource] = [
         verified=True,
         notes="Schema and config verified from the published Parquet index.",
     ),
+    *[
+        ExternalSource(
+            id=f"omnilingual-{language}",
+            hf_dataset_id="facebook/omnilingual-asr-corpus",
+            hf_config=f"{language}_Latn",
+            hf_split="train",
+            target_config="fula",
+            language=language,
+            audio_column="audio",
+            text_column="raw_text",
+            license="CC-BY-4.0",
+            attribution=f"Meta Omnilingual ASR Corpus, {variant_name}",
+            verified=True,
+            notes="Published train split; validation is generated with --eval-size.",
+        )
+        for language, variant_name in OMNILINGUAL_FULA_VARIANTS.items()
+    ],
     ExternalSource(
         id="moore-bible",
         hf_dataset_id="madoss/moore_audio_data",
@@ -143,7 +173,8 @@ MANIFEST: list[ExternalSource] = [
         text_column="text",
         license="unknown",
         attribution="madoss/moore_audio_data (Bible audio)",
-        notes="Verify column names and license via --inspect before enabling.",
+        verified=True,
+        notes="Schema verified from the published Parquet metadata; license is not declared.",
     ),
     ExternalSource(
         id="koumankan4dyula",
@@ -153,13 +184,29 @@ MANIFEST: list[ExternalSource] = [
         target_config="bambara_jula",
         language="dyu",
         audio_column="audio",
-        text_column="transcription",
+        text_column="dyu",
         license="unknown",
         attribution="UVCI Koumankan4Dyula",
+        eval_splits=("dev", "test"),
+        verified=True,
+        notes="Schema and all three published splits verified; Hub access approval is required.",
+    ),
+    ExternalSource(
+        id="merged-bambara-dioula",
+        hf_dataset_id="madoss/merged-bambara-dioula-dataset",
+        hf_config=None,
+        hf_split="train",
+        target_config="bambara_jula",
+        language="und",
+        audio_column="audio",
+        text_column="transcription",
+        license="unknown",
+        attribution="madoss/merged-bambara-dioula-dataset",
+        eval_splits=("validation", "test"),
+        verified=True,
         notes=(
-            "text_column is a best guess (transcription/sentence/text); confirm via "
-            "--inspect. Also confirm the BF-dialect share of speakers before merging "
-            "into the Jula data."
+            "Mixed Bambara/Jula corpus without a per-row language label. Exact transcript "
+            "comparison found 9,495 overlaps with the previous bambara_jula release."
         ),
     ),
     ExternalSource(
@@ -171,9 +218,9 @@ MANIFEST: list[ExternalSource] = [
         language="dyu",
         audio_column="audio",
         text_column="transcription",
-        license="unknown",
+        license="CC-BY-4.0",
         attribution="Google FLEURS, Jula",
-        notes="hf_config code is a best guess; confirm the exact FLEURS Jula config via --inspect.",
+        notes="Not available: FLEURS does not publish a Dyula/Jula configuration.",
     ),
     # ExternalSource(
     #     id="dioula-bambara-cv",
@@ -195,24 +242,27 @@ MANIFEST: list[ExternalSource] = [
         hf_split="train",
         target_config="fula",
         language="fuf",
-        audio_column="audio",
+        audio_column="path",
         text_column="text",
         license="unknown",
         attribution="Pullo-Africa-Protagonist/Fula-pular",
-        notes="Different Fula variant than the BF target dialect; kept in its own config.",
+        verified=True,
+        notes="Schema verified. Different Fula variant than the BF target dialect.",
     ),
     ExternalSource(
         id="waxalnlp-ful",
         hf_dataset_id="google/WaxalNLP",
-        hf_config="ff",
+        hf_config="ful_asr",
         hf_split="train",
         target_config="fula",
         language="ful",
         audio_column="audio",
-        text_column="text",
-        license="unknown",
+        text_column="transcription",
+        license="CC-BY-SA-4.0",
         attribution="Google WaxalNLP, Fula",
-        notes="WaxalNLP likely needs a specific per-language config name; confirm via --inspect.",
+        eval_splits=("validation", "test"),
+        verified=True,
+        notes="Fula ASR config and schema verified; the unlabeled split is intentionally excluded.",
     ),
     # ExternalSource(
     #     id="soreva",
@@ -236,9 +286,11 @@ MANIFEST: list[ExternalSource] = [
         language="fuc",
         audio_column="audio",
         text_column="transcription",
-        license="unknown",
+        license="CC-BY-4.0",
         attribution="Google FLEURS, Fulfulde",
-        notes="Senegal/other Fulfulde variant, not the BF dialect; hf_config code needs confirming.",
+        eval_splits=("validation", "test"),
+        verified=True,
+        notes="Schema and config verified; Senegalese Fula rather than the Burkina Faso dialect.",
     ),
     # ExternalSource(
     #     id="common-voice-ff",
@@ -276,13 +328,17 @@ def example_id(entry: ExternalSource, row: dict, audio_value: dict) -> str:
 def load_split(
     entry: ExternalSource, *, split: str, limit: int, token: str | None
 ) -> Dataset:
-    load_kwargs: dict[str, object] = {"split": split, "token": token}
+    requested_split = f"{split}[:{limit}]" if limit > 0 else split
+    load_kwargs: dict[str, object] = {"split": requested_split, "token": token}
     if entry.hf_config:
         load_kwargs["name"] = entry.hf_config
-    dataset = load_dataset(entry.hf_dataset_id, **load_kwargs)
-    if limit > 0:
-        dataset = dataset.select(range(min(limit, len(dataset))))
-    return dataset
+    return load_dataset(entry.hf_dataset_id, **load_kwargs)
+
+
+def concatenate_splits(datasets: list[Dataset]) -> Dataset:
+    if not datasets:
+        raise ValueError("At least one dataset split is required")
+    return concatenate_datasets(datasets) if len(datasets) > 1 else datasets[0]
 
 
 def normalize_source(
@@ -318,12 +374,14 @@ def normalize_source(
     return normalized.cast(COMMON_FEATURES)
 
 
-def dedup_train_validation(train: Dataset, validation: Dataset) -> tuple[Dataset, Dataset]:
+def dedup_train_validation(
+    train: Dataset, validation: Dataset, *, text_only: bool = False
+) -> tuple[Dataset, Dataset]:
     """Deduplicate globally while giving published validation rows priority."""
-    seen: set[tuple[str, str]] = set()
+    seen: set[str | tuple[str, str]] = set()
 
     def keep(row: dict) -> bool:
-        key = (row["language"], row["text"])
+        key = row["text"] if text_only else (row["language"], row["text"])
         if key in seen:
             return False
         seen.add(key)
@@ -334,7 +392,8 @@ def dedup_train_validation(train: Dataset, validation: Dataset) -> tuple[Dataset
     train = train.filter(keep)
     dropped = before - len(train) - len(validation)
     if dropped:
-        print(f"  dedup: dropped {dropped} duplicate (language, text) rows")
+        key_name = "text" if text_only else "(language, text)"
+        print(f"  dedup: dropped {dropped} duplicate {key_name} rows")
     return train, validation
 
 
@@ -479,12 +538,27 @@ def main() -> None:
             limit=args.limit,
             token=token,
         )
-        if "validation" in split_names:
-            validation = normalize_source(
-                entry,
-                split="validation",
-                limit=args.limit,
-                token=token,
+        eval_splits = entry.eval_splits
+        if not eval_splits and "validation" in split_names:
+            eval_splits = ("validation",)
+
+        if eval_splits:
+            missing_splits = sorted(set(eval_splits) - set(split_names))
+            if missing_splits:
+                raise SystemExit(
+                    f"{entry.id}: configured evaluation splits do not exist: {missing_splits}; "
+                    f"available splits: {split_names}"
+                )
+            validation = concatenate_splits(
+                [
+                    normalize_source(
+                        entry,
+                        split=split,
+                        limit=args.limit,
+                        token=token,
+                    )
+                    for split in eval_splits
+                ]
             )
         else:
             generated = split_dataset(
@@ -502,18 +576,16 @@ def main() -> None:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for config_name, train_datasets in sorted(train_by_config.items()):
-        train = (
-            concatenate_datasets(train_datasets) if len(train_datasets) > 1 else train_datasets[0]
-        )
+        train = concatenate_splits(train_datasets)
         validation_datasets = validation_by_config.get(config_name, [])
         if not validation_datasets:
             raise SystemExit(f"No validation rows available for config {config_name!r}")
-        validation = (
-            concatenate_datasets(validation_datasets)
-            if len(validation_datasets) > 1
-            else validation_datasets[0]
+        validation = concatenate_splits(validation_datasets)
+        train, validation = dedup_train_validation(
+            train,
+            validation,
+            text_only=config_name == "bambara_jula",
         )
-        train, validation = dedup_train_validation(train, validation)
         combined = concatenate_datasets([train, validation])
         print_summary(config_name, combined)
 
