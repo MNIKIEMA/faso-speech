@@ -192,6 +192,24 @@ MANIFEST: list[ExternalSource] = [
         notes="Schema and all three published splits verified; Hub access approval is required.",
     ),
     ExternalSource(
+        id="dyula-speech-bible",
+        hf_dataset_id="Minervus00/dyula-speech-bible",
+        hf_config=None,
+        hf_split="train",
+        target_config="bambara_jula",
+        language="dyu",
+        audio_column="audio",
+        text_column="transcription",
+        license="unknown",
+        attribution="Minervus00/dyula-speech-bible",
+        verified=True,
+        notes=(
+            "Gated Dyula Bible corpus with one published train split; validation is generated "
+            "with --eval-size. Transcript comparison found 1,949 internal duplicate rows and "
+            "3 overlaps with the previous bambara_jula release."
+        ),
+    ),
+    ExternalSource(
         id="merged-bambara-dioula",
         hf_dataset_id="madoss/merged-bambara-dioula-dataset",
         hf_config=None,
@@ -391,9 +409,22 @@ def dedup_train_validation(
     validation = validation.filter(keep)
     train = train.filter(keep)
     dropped = before - len(train) - len(validation)
+    key_name = "text" if text_only else "(language, text)"
     if dropped:
-        key_name = "text" if text_only else "(language, text)"
         print(f"  dedup: dropped {dropped} duplicate {key_name} rows")
+
+    train_keys = {
+        row["text"] if text_only else (row["language"], row["text"]) for row in train
+    }
+    validation_keys = {
+        row["text"] if text_only else (row["language"], row["text"]) for row in validation
+    }
+    overlap = train_keys & validation_keys
+    if overlap:
+        raise RuntimeError(
+            f"dedup failed: {len(overlap)} {key_name} keys remain in both train and validation"
+        )
+    print(f"  dedup: verified no {key_name} overlap between train and validation")
     return train, validation
 
 
