@@ -1,5 +1,5 @@
 ---
-license: other
+license: cc-by-4.0
 language:
   - mos
   - dyu
@@ -121,13 +121,11 @@ Same compact schema as `faso-speech`, plus per-row provenance:
 
 ## Licensing And Attribution
 
-Source licenses differ per entry in the manifest — several are still
-`unknown` and must be confirmed from the original source before this dataset
-is published or used commercially. This is the reason `faso-speech-plus` is
-a separate repo from `faso-speech`: it aggregates third-party data with
-mixed, not-yet-fully-verified licensing, unlike the curated
-`mooreburkina.com`-sourced `faso-speech` corpus.
+Faso Speech Plus is released under the
+[Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+license.
 
-Consult the row-level `license`, `source`, and `attribution` fields before use.
-Some included sources do not declare a license and are recorded as `unknown`;
-users are responsible for verifying that their intended use is permitted.
+Rows from third-party sources also keep the upstream terms recorded in the
+row-level `license`, `source`, and `attribution` fields. Credit the upstream
+source for those rows, and follow any additional upstream terms (for example,
+WaxalNLP rows are CC-BY-SA-4.0).

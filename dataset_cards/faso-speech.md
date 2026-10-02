@@ -1,5 +1,5 @@
 ---
-license: other
+license: cc-by-4.0
 language:
   - mos
   - dyu
@@ -128,7 +128,10 @@ material.
 
 ## Licensing And Attribution
 
-Source licensing and attribution should be verified from the original source
-pages before redistribution or downstream commercial use. The project tracks
-source provenance, but the current GitHub README does not declare a single
-open license for the processed dataset contents.
+Faso Speech is released under the
+[Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+license.
+
+The audio and texts come from [mooreburkina.com](https://mooreburkina.com).
+When you use or redistribute the dataset, credit both Faso Speech and
+mooreburkina.com, and keep the per-record provenance where possible.
