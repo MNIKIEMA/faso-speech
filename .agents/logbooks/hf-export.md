@@ -14,8 +14,9 @@ deterministic 90/10 train/validation split.
   the CSV is the only gate. Verified on the real metadata: 8,053 of 9,291
   rows get a speaker ID.
 - Not yet re-published with the new columns; next release tag `v1.1.0`.
-- License decided: CC-BY-4.0 for all cards (the Hub already said `cc-by-4.0`;
+- License decided: CC-BY-4.0 for the faso-speech and dioula-digits cards (the Hub already said `cc-by-4.0`;
   the local card had `other`). Card now credits mooreburkina.com.
+  faso-speech-plus stays `other` because it mixes licenses.
 
 ## 2026-06-14
 

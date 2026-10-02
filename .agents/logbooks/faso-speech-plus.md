@@ -18,10 +18,10 @@ of sources, column mappings, licenses and per-source notes.
   [`speakers.md`](speakers.md).
 - Next release: re-export faso-speech first, then rebuild this, push, tag
   `v0.2.0`.
-- Card license set to CC-BY-4.0 (maintainer decision); faso-speech manifest
-  entries now record `CC-BY-4.0` instead of `unknown`. Third-party rows keep
-  their upstream `license` value. Open conflict: WaxalNLP is CC-BY-SA-4.0
-  (share-alike), and several sources are still `unknown`.
+- Card license is `other`: the dataset mixes CC-BY-4.0, CC-BY-SA-4.0
+  (WaxalNLP) and undeclared (`unknown`) sources, so no single license fits.
+  Per-row `license` is authoritative. faso-speech manifest entries now record
+  `CC-BY-4.0` instead of `unknown`.
 
 ## 2026-08-13
 

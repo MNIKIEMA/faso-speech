@@ -1,5 +1,5 @@
 ---
-license: cc-by-4.0
+license: other
 language:
   - mos
   - dyu
@@ -121,11 +121,15 @@ Same compact schema as `faso-speech`, plus per-row provenance:
 
 ## Licensing And Attribution
 
-Faso Speech Plus is released under the
-[Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
-license.
+Faso Speech Plus aggregates sources under different licenses, so it has no
+single license. Each row records its own terms in the `license`, `source`, and
+`attribution` fields:
 
-Rows from third-party sources also keep the upstream terms recorded in the
-row-level `license`, `source`, and `attribution` fields. Credit the upstream
-source for those rows, and follow any additional upstream terms (for example,
-WaxalNLP rows are CC-BY-SA-4.0).
+- `madoss/faso-speech` rows are CC-BY-4.0.
+- Meta Omnilingual ASR Corpus and Google FLEURS rows are CC-BY-4.0.
+- Google WaxalNLP rows are CC-BY-SA-4.0 (share-alike).
+- Several sources do not declare a license and are recorded as `unknown`.
+
+Filter on `license` to keep only the terms your use allows, and credit the
+upstream source of every row you use. Users are responsible for verifying
+that their intended use is permitted.
