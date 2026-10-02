@@ -6,6 +6,18 @@ deterministic 90/10 train/validation split.
 
 ## 2026-10-02
 
+- `gender` falls back to inaSpeechSegmenter when `speakers.csv` has none: the
+  segmenter labels speech `male`/`female`, which `normalize_segment_label`
+  used to collapse to `speech` before writing, so the 8,862 existing segment
+  CSVs carry no gender. Segment CSVs now keep a `gender` column; the export
+  takes the dominant gender over speech time if it covers >=
+  `--gender-min-share` (0.8). Old CSVs without the column give null. Needs a
+  re-run: `uv run faso-speech preprocess segments --refresh`.
+- Speaker IDs cannot come from inaSpeechSegmenter (no speaker embedding /
+  diarization); they stay manual in `metadata/speakers.csv`.
+- `preprocess segments --dry-run` still writes `segmentation_log.csv` (default
+  `data/processed/`), overwriting the previous run's log. Pass `--log` to a
+  scratch path when only inspecting.
 - Tagged the Hub repo `v1.0.0` at `fbc4118a` before adding columns.
 - Export now joins `metadata/speakers.csv` on `catalog_id` and adds
   `speaker_id` and `gender` to the training columns (null when unknown).

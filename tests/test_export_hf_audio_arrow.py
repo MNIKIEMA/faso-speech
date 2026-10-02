@@ -188,3 +188,28 @@ def test_attach_speakers_is_noop_without_speakers_file(tmp_path, monkeypatch):
     rows = [{"chunk_id": "a", "catalog_id": "moore-contes-vol3"}]
 
     assert export.attach_speakers(rows, export.read_speakers(tmp_path / "missing.csv")) == rows
+
+
+def test_segments_gender_uses_dominant_speech_gender(tmp_path, monkeypatch):
+    export = load_export_module(monkeypatch)
+    segments = tmp_path / "chunk.segments.csv"
+    segments.write_text(
+        "label,start,end,duration,gender\n"
+        "music,0.0,5.0,5.0,\n"
+        "speech,5.0,9.0,4.0,female\n"
+        "speech,9.0,9.5,0.5,male\n",
+        encoding="utf-8",
+    )
+
+    parsed = export.read_segments(segments)
+
+    assert export.segments_gender(parsed) == "female"
+    assert export.segments_gender(parsed, min_share=0.95) is None
+
+
+def test_segments_gender_is_none_for_old_csv_without_gender(tmp_path, monkeypatch):
+    export = load_export_module(monkeypatch)
+    segments = tmp_path / "chunk.segments.csv"
+    segments.write_text("label,start,end,duration\nspeech,0.0,1.0,1.0\n", encoding="utf-8")
+
+    assert export.segments_gender(export.read_segments(segments)) is None

@@ -229,3 +229,21 @@ def test_segment_processed_tree_writes_custom_log_for_dry_run(tmp_path, monkeypa
     assert row["status"] == "would_segment"
     assert row["audio_path"] == str(chunk_audio)
     assert row["output_csv"].endswith("chunk.segments.csv")
+
+
+def test_run_inaspeechsegmenter_keeps_gender(monkeypatch, tmp_path):
+    import faso_speech.processing.segment as segment
+
+    monkeypatch.setattr(
+        segment,
+        "load_segmenter",
+        lambda: lambda path: [("music", 0.0, 1.0), ("female", 1.0, 2.5), ("noEnergy", 2.5, 3.0)],
+    )
+
+    rows = segment.run_inaspeechsegmenter(tmp_path / "chunk.wav")
+
+    assert [(row["label"], row["gender"]) for row in rows] == [
+        ("music", ""),
+        ("speech", "female"),
+        ("noise", ""),
+    ]

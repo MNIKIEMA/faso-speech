@@ -9,6 +9,10 @@ speaker_name, evidence, notes`. Only `speaker_id` and `gender` are published;
 
 ## 2026-10-02
 
+- inaSpeechSegmenter gives gender per speech segment but not speaker
+  identity. Once segments are re-run with gender, aggregate per catalog to
+  sanity-check the listening-based genders above and to fill unknown ones
+  (Dioula vol2, Fulfulde catalogs) -- treat model gender as a hint, not proof.
 - Mooré speakers come from the maintainer's listening checks: vol2 one male
   (`mos-spk-01`); vol3 one female (`mos-spk-02`), reused in vol4; vol5 one
   female different from vol3 (`mos-spk-03`); proverbes one male different from

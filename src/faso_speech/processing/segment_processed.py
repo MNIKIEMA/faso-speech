@@ -13,7 +13,7 @@ from faso_speech.processing.segment import run_inaspeechsegmenter
 AUDIO_SUFFIXES = {".flac", ".m4a", ".mp3", ".ogg", ".wav"}
 MIN_SEGMENTER_DURATION_SECONDS = 0.72
 LOG_COLUMNS = ["status", "audio_path", "output_csv", "duration", "segments", "message"]
-SEGMENT_COLUMNS = ["label", "start", "end", "duration"]
+SEGMENT_COLUMNS = ["label", "start", "end", "duration", "gender"]
 
 
 @dataclass(frozen=True)

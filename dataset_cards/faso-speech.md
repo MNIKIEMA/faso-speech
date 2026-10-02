@@ -84,7 +84,7 @@ The dataset uses a compact ASR-oriented schema:
 | `record_id` | Source record identifier |
 | `content_type` | Source content type |
 | `speaker_id` | Opaque per-speaker identifier from `metadata/speakers.csv`, or null when the reader is unknown |
-| `gender` | Speaker gender (`male`/`female`), or null when unknown |
+| `gender` | Speaker gender (`male`/`female`): from `metadata/speakers.csv` when the speaker is known, otherwise predicted by inaSpeechSegmenter when one gender covers at least 80% of the chunk's speech; null otherwise |
 
 ## Usage
 

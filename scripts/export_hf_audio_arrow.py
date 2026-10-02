@@ -48,6 +48,7 @@ MUSIC_START_PADDING = 0.05
 MUSIC_END_PADDING = 0.05
 MAX_INTRA_SEGMENT_GAP = 0.50
 MAX_MUSIC_GAP = 0.05
+GENDER_MIN_SHARE = 0.8
 
 
 def read_metadata(metadata_path: Path) -> list[dict[str, str]]:
@@ -154,8 +155,24 @@ def read_segments(segments_path: Path) -> list[dict[str, float | str]]:
             end = float(row["end"])
             if end <= start:
                 continue
-            segments.append({"label": label, "start": start, "end": end})
+            gender = (row.get("gender") or "").strip()
+            segments.append({"label": label, "start": start, "end": end, "gender": gender})
     return segments
+
+
+def segments_gender(
+    segments: list[dict[str, float | str]], *, min_share: float = GENDER_MIN_SHARE
+) -> str | None:
+    """Return the dominant inaSpeechSegmenter gender over speech time, if clear enough."""
+    durations = {"male": 0.0, "female": 0.0}
+    for segment in segments:
+        if segment["label"] == "speech" and segment.get("gender") in durations:
+            durations[str(segment["gender"])] += float(segment["end"]) - float(segment["start"])
+    total = sum(durations.values())
+    if total <= 0:
+        return None
+    gender, duration = max(durations.items(), key=lambda item: item[1])
+    return gender if duration / total >= min_share else None
 
 
 def padded_speech_ranges(
@@ -362,6 +379,7 @@ def build_dataset(
     music_end_padding: float = MUSIC_END_PADDING,
     max_intra_segment_gap: float = MAX_INTRA_SEGMENT_GAP,
     max_music_gap: float = MAX_MUSIC_GAP,
+    gender_min_share: float = GENDER_MIN_SHARE,
 ) -> Dataset:
     metadata_path = input_dir / metadata_name
     rows = read_metadata(metadata_path)
@@ -402,6 +420,14 @@ def build_dataset(
             max_intra_segment_gap=max_intra_segment_gap,
             max_music_gap=max_music_gap,
         )
+
+        if "gender" in columns and not export_row.get("gender"):
+            segments_path = resolve_segments_path(input_dir, row, audio_path)
+            if segments_path:
+                export_row = {
+                    **export_row,
+                    "gender": segments_gender(read_segments(segments_path), min_share=gender_min_share),
+                }
 
         columns[audio_column].append(payload)
         for column in metadata_columns:
@@ -508,6 +534,15 @@ def parse_args() -> argparse.Namespace:
         "--no-speakers",
         action="store_true",
         help="Do not add speaker_id and gender columns.",
+    )
+    parser.add_argument(
+        "--gender-min-share",
+        type=float,
+        default=GENDER_MIN_SHARE,
+        help=(
+            "When speakers.csv has no gender, use the inaSpeechSegmenter gender covering at "
+            "least this share of a chunk's speech. Default: 0.8."
+        ),
     )
     parser.add_argument("--limit", type=int, default=0, help="Maximum rows to export. Default: all.")
     parser.add_argument(
@@ -618,6 +653,7 @@ def main() -> None:
         music_end_padding=args.music_end_padding,
         max_intra_segment_gap=args.max_intra_segment_gap,
         max_music_gap=args.max_music_gap,
+        gender_min_share=args.gender_min_share,
     )
     splits = split_dataset(
         dataset,

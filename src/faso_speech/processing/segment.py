@@ -80,6 +80,7 @@ def run_inaspeechsegmenter(audio_path: Path) -> list[dict[str, float | str]]:
                 "start": start,
                 "end": end,
                 "duration": max(0.0, end - start),
+                "gender": segment_gender(str(label)),
             }
         )
     return rows
@@ -95,6 +96,12 @@ def read_segments(path: Path) -> list[dict[str, float | str]]:
             row["duration"] = float(row["duration"])
             segments.append(row)
     return segments
+
+
+def segment_gender(label: str) -> str:
+    """Keep inaSpeechSegmenter's male/female speech label before normalization."""
+    normalized = label.strip()
+    return normalized if normalized in {"male", "female"} else ""
 
 
 def normalize_segment_label(label: str) -> str:
