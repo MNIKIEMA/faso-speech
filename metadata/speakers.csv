@@ -1,0 +1,12 @@
+catalog_id,speaker_id,gender,status,speaker_name,evidence,notes
+moore-contes-vol2,mos-spk-01,male,confirmed,,listening check,single speaker
+moore-contes-vol3,mos-spk-02,female,confirmed,Kinda,listening check; name from audio filenames (01 Kinda cont vol 1.mp3),single speaker; name is filename-derived and unconfirmed
+moore-contes-vol4,mos-spk-02,female,confirmed,Kinda,listening check; same speaker as moore-contes-vol3,
+moore-contes-vol5,mos-spk-03,female,confirmed,,listening check,single speaker; different from mos-spk-02
+moore-devinettes,mos-spk-04,female,unconfirmed,,listening check,possibly the same speaker as mos-spk-02 (moore-contes-vol3); merge IDs once confirmed
+moore-proverbes-vol1,mos-spk-05,male,confirmed,,listening check,different from mos-spk-01
+dioula-contes-vol1,dyu-spk-01,female,confirmed,Mme Dakuyo Aïssata / Sanou,"source page: ""lus par l'auteur Auteur Mme Dakuyo Aïssata / Sanou""",
+dioula-contes-vol2,dyu-spk-02,,confirmed,Maïmouna Guira,"source page: ""© audio par Maïmouna Guira""",gender not stated
+fulfulde-contes-vol1,fuh-spk-01,,unconfirmed,Absa,name from audio filenames (01 Ful cont Absa.mp3),not stated on source page; single speaker not verified
+fulfulde-contes-vol2,,,unknown,,,
+fulfulde-proverbes-vol1,,,unknown,,,

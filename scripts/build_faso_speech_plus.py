@@ -41,6 +41,8 @@ COMMON_FEATURES = Features(
         "duration": Value("float64"),
         "id": Value("string"),
         "content_type": Value("string"),
+        "speaker_id": Value("string"),
+        "gender": Value("string"),
         "source": Value("string"),
         "license": Value("string"),
         "attribution": Value("string"),
@@ -59,6 +61,8 @@ OMNILINGUAL_FULA_VARIANTS = {
     "fuv": "Nigerian Fulfulde",
 }
 
+GENDER_VALUES = {"m": "male", "male": "male", "f": "female", "female": "female"}
+
 
 @dataclass
 class ExternalSource:
@@ -73,6 +77,8 @@ class ExternalSource:
     license: str
     attribution: str
     eval_splits: tuple[str, ...] = ()
+    speaker_column: str | None = None
+    gender_column: str | None = None
     verified: bool = False
     notes: str = ""
 
@@ -89,6 +95,8 @@ MANIFEST: list[ExternalSource] = [
         text_column="text",
         license="unknown",
         attribution="madoss/faso-speech (mooreburkina.com)",
+        speaker_column="speaker_id",
+        gender_column="gender",
         verified=True,
     ),
     ExternalSource(
@@ -102,6 +110,8 @@ MANIFEST: list[ExternalSource] = [
         text_column="text",
         license="unknown",
         attribution="madoss/faso-speech (mooreburkina.com)",
+        speaker_column="speaker_id",
+        gender_column="gender",
         verified=True,
     ),
     ExternalSource(
@@ -115,6 +125,8 @@ MANIFEST: list[ExternalSource] = [
         text_column="text",
         license="unknown",
         attribution="madoss/faso-speech (mooreburkina.com)",
+        speaker_column="speaker_id",
+        gender_column="gender",
         verified=True,
     ),
     ExternalSource(
@@ -157,6 +169,7 @@ MANIFEST: list[ExternalSource] = [
             text_column="raw_text",
             license="CC-BY-4.0",
             attribution=f"Meta Omnilingual ASR Corpus, {variant_name}",
+            speaker_column="speaker_id",
             verified=True,
             notes="Published train split; validation is generated with --eval-size.",
         )
@@ -188,6 +201,7 @@ MANIFEST: list[ExternalSource] = [
         license="unknown",
         attribution="UVCI Koumankan4Dyula",
         eval_splits=("dev", "test"),
+        gender_column="gender",
         verified=True,
         notes="Schema and all three published splits verified; Hub access approval is required.",
     ),
@@ -206,7 +220,9 @@ MANIFEST: list[ExternalSource] = [
         notes=(
             "Gated Dyula Bible corpus with one published train split; validation is generated "
             "with --eval-size. Transcript comparison found 1,949 internal duplicate rows and "
-            "3 overlaps with the previous bambara_jula release."
+            "3 overlaps with the previous bambara_jula release. Its speaker_id values look like "
+            "diarization labels (SPEAKER_00) and are not mapped until confirmed consistent "
+            "across chapters."
         ),
     ),
     ExternalSource(
@@ -279,6 +295,8 @@ MANIFEST: list[ExternalSource] = [
         license="CC-BY-SA-4.0",
         attribution="Google WaxalNLP, Fula",
         eval_splits=("validation", "test"),
+        speaker_column="speaker_id",
+        gender_column="gender",
         verified=True,
         notes="Fula ASR config and schema verified; the unlabeled split is intentionally excluded.",
     ),
@@ -343,6 +361,16 @@ def example_id(entry: ExternalSource, row: dict, audio_value: dict) -> str:
     return hashlib.sha1(identity).hexdigest()[:16]
 
 
+def speaker_id(entry: ExternalSource, row: dict) -> str | None:
+    value = str(row.get(entry.speaker_column) or "").strip() if entry.speaker_column else ""
+    return f"{entry.id}:{value}" if value else None
+
+
+def gender(entry: ExternalSource, row: dict) -> str | None:
+    value = str(row.get(entry.gender_column) or "").strip().lower() if entry.gender_column else ""
+    return GENDER_VALUES.get(value, value) or None
+
+
 def load_split(
     entry: ExternalSource, *, split: str, limit: int, token: str | None
 ) -> Dataset:
@@ -380,6 +408,8 @@ def normalize_source(
             "duration": round(duration, 3),
             "id": example_id(entry, row, audio_value),
             "content_type": str(row.get("content_type") or "external"),
+            "speaker_id": speaker_id(entry, row),
+            "gender": gender(entry, row),
             "source": entry.id,
             "license": entry.license,
             "attribution": entry.attribution,

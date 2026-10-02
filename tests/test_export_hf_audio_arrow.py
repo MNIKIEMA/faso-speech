@@ -154,3 +154,37 @@ def test_export_ranges_cut_long_non_music_gap(tmp_path, monkeypatch):
     )
 
     assert ranges == [(0.4, 1.1), (1.9, 2.6)]
+
+
+def test_attach_speakers_joins_on_catalog_id(tmp_path, monkeypatch):
+    export = load_export_module(monkeypatch)
+    speakers_csv = tmp_path / "speakers.csv"
+    speakers_csv.write_text(
+        "catalog_id,speaker_id,gender,status,speaker_name,evidence,notes\n"
+        "moore-contes-vol3,mos-spk-02,female,confirmed,,,\n"
+        "dioula-contes-vol2,dyu-spk-02,,confirmed,,,\n"
+        "fulfulde-contes-vol2,,,unknown,,,\n",
+        encoding="utf-8",
+    )
+
+    rows = export.attach_speakers(
+        [
+            {"chunk_id": "a", "catalog_id": "moore-contes-vol3"},
+            {"chunk_id": "b", "catalog_id": "dioula-contes-vol2"},
+            {"chunk_id": "c", "catalog_id": "fulfulde-contes-vol2"},
+        ],
+        export.read_speakers(speakers_csv),
+    )
+
+    assert [(row["speaker_id"], row["gender"]) for row in rows] == [
+        ("mos-spk-02", "female"),
+        ("dyu-spk-02", None),
+        (None, None),
+    ]
+
+
+def test_attach_speakers_is_noop_without_speakers_file(tmp_path, monkeypatch):
+    export = load_export_module(monkeypatch)
+    rows = [{"chunk_id": "a", "catalog_id": "moore-contes-vol3"}]
+
+    assert export.attach_speakers(rows, export.read_speakers(tmp_path / "missing.csv")) == rows

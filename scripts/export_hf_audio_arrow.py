@@ -37,7 +37,11 @@ TRAINING_COLUMNS = [
     "chunk_id",
     "record_id",
     "content_type",
+    "speaker_id",
+    "gender",
 ]
+SPEAKER_COLUMNS = ("speaker_id", "gender")
+DEFAULT_SPEAKERS_PATH = Path(__file__).resolve().parents[1] / "metadata" / "speakers.csv"
 SEGMENT_START_PADDING = 0.15
 SEGMENT_END_PADDING = 0.25
 MUSIC_START_PADDING = 0.05
@@ -49,6 +53,29 @@ MAX_MUSIC_GAP = 0.05
 def read_metadata(metadata_path: Path) -> list[dict[str, str]]:
     with metadata_path.open(newline="", encoding="utf-8") as metadata_file:
         return list(csv.DictReader(metadata_file))
+
+
+def read_speakers(speakers_path: Path | None) -> dict[str, dict[str, str | None]]:
+    """Map catalog_id to speaker fields, skipping catalogs without a speaker_id."""
+    if speakers_path is None or not speakers_path.exists():
+        return {}
+    speakers: dict[str, dict[str, str]] = {}
+    for row in read_metadata(speakers_path):
+        catalog_id = row.get("catalog_id", "").strip()
+        if catalog_id and row.get("speaker_id", "").strip():
+            speakers[catalog_id] = {
+                column: row.get(column, "").strip() or None for column in SPEAKER_COLUMNS
+            }
+    return speakers
+
+
+def attach_speakers(
+    rows: list[dict[str, str]], speakers: dict[str, dict[str, str | None]]
+) -> list[dict[str, str | None]]:
+    if not speakers:
+        return rows
+    empty = dict.fromkeys(SPEAKER_COLUMNS)
+    return [{**row, **speakers.get(row.get("catalog_id", ""), empty)} for row in rows]
 
 
 def infer_file_column(rows: list[dict[str, str]], file_column: str | None) -> str:
@@ -324,6 +351,7 @@ def build_dataset(
     audio_column: str = "audio",
     languages: set[str] | None = None,
     content_types: set[str] | None = None,
+    speakers_path: Path | None = None,
     metadata_columns: list[str] | None = None,
     include_all_metadata: bool = False,
     limit: int = 0,
@@ -348,6 +376,7 @@ def build_dataset(
     )
     if not rows:
         raise SystemExit(f"No matching rows found in {metadata_path}")
+    rows = attach_speakers(rows, read_speakers(speakers_path))
 
     columns: dict[str, list[object]] = {audio_column: []}
     if include_all_metadata:
@@ -469,6 +498,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Keep every metadata column instead of the default training columns.",
     )
+    parser.add_argument(
+        "--speakers",
+        type=Path,
+        default=DEFAULT_SPEAKERS_PATH,
+        help="CSV mapping catalog_id to speaker_id and gender. Default: metadata/speakers.csv.",
+    )
+    parser.add_argument(
+        "--no-speakers",
+        action="store_true",
+        help="Do not add speaker_id and gender columns.",
+    )
     parser.add_argument("--limit", type=int, default=0, help="Maximum rows to export. Default: all.")
     parser.add_argument(
         "--audio-column",
@@ -567,6 +607,7 @@ def main() -> None:
         audio_column=args.audio_column,
         languages=set(args.language or []),
         content_types=set(args.content_type or []),
+        speakers_path=None if args.no_speakers else args.speakers,
         metadata_columns=args.column,
         include_all_metadata=args.include_all_metadata,
         limit=args.limit,
