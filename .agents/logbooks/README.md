@@ -28,6 +28,14 @@ new language.
 | Fulfulde (Burkina) | `fuh` | hf-export, faso-speech-plus, speakers |
 | Other Fula varieties | `fuf`, `fuc`, `ful`, ... | faso-speech-plus, speakers |
 
+## Dataset cards
+
+Hub `README.md` files live in `dataset_cards/`, named after the Hub repo:
+`faso-speech.md`, `faso-speech-plus.md`, `faso-speech-dioula-digits.md`.
+Edit them here, then upload as `README.md`. Note that `push_to_hub`
+regenerates the `dataset_info`/`configs` YAML on the Hub, so the Hub copy can
+drift from this one in the front matter.
+
 ## Hub releases
 
 | Repo | Tag | Commit | Meaning |

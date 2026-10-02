@@ -113,6 +113,8 @@ Same compact schema as `faso-speech`, plus per-row provenance:
 | `duration` | Chunk duration in seconds |
 | `id` | Source-prefixed native identifier, or a generated 16-character hash |
 | `content_type` | Source content type, or `external` when the source doesn't provide one |
+| `speaker_id` | `<source>:<upstream speaker id>`, or null when the source has no speaker labels |
+| `gender` | Speaker gender (`male`/`female`) when the source provides it, otherwise null |
 | `source` | Manifest entry id this row came from (see `MANIFEST` in the build script) |
 | `license` | License string recorded for that source in the manifest |
 | `attribution` | Attribution string recorded for that source in the manifest |

@@ -19,7 +19,7 @@ deterministic 90/10 train/validation split.
 
 - Segmentation is applied at export time: when an
   `inaSpeechSegmenter` segments CSV exists for a chunk, only padded speech
-  ranges are embedded (defaults documented in `README_HF.md`); otherwise the
+  ranges are embedded (defaults documented in `dataset_cards/faso-speech.md`); otherwise the
   original chunk audio is kept. Duration is recomputed from the kept ranges.
 - Default export keeps only training columns; `--include-all-metadata` keeps
   everything.
